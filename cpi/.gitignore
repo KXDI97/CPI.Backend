@@ -1,0 +1,28 @@
+# Archivos de compilación
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# Archivos de configuración y depuración
+*.cache.json
+*.sourcelink.json
+*.log
+
+# Configuración de usuario de Visual Studio
+*.user
+*.suo
+*.userosscache
+*.vs/
+
+# VS Code
+.vscode/
+
+# Archivos de sistema
+Thumbs.db
+desktop.ini
+
+# Ignorar TODAS las configuraciones de appsettings
+appsettings*.json
+!appsettings.Development.json
