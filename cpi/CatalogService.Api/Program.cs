@@ -1,53 +1,29 @@
+using CatalogService.Application.Clients;
+using CatalogService.Infrastructure.Clients;
 using CatalogService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ConnectionString desde appsettings.json -> "DefaultConnection"
-builder.Services.AddDbContext<CpiDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// DB
+builder.Services.AddDbContext<CpiDbContext>(opt =>
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("CpiSqlServer")));
 
-// OpenAPI del template
-builder.Services.AddOpenApi();
+// DI
+builder.Services.AddScoped<IClientService, ClientService>();
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// CORS para tu front
+builder.Services.AddCors(o => o.AddPolicy("CPI", p =>
+    p.WithOrigins("http://127.0.0.1:5500","http://localhost:5500")
+     .AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
-
-// Pipeline
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-app.UseHttpsRedirection();
-
-// ---- Endpoint de prueba del template (lo puedes dejar) ----
-var summaries = new[]
-{
-    "Freezing","Bracing","Chilly","Cool","Mild","Warm","Balmy","Hot","Sweltering","Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast(
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        )).ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-// ---- Endpoint de salud para probar la DB ----
-app.MapGet("/health/db", async (CpiDbContext db) =>
-{
-    var ok = await db.Database.CanConnectAsync();
-    return Results.Ok(new { DbCanConnect = ok, UtcNow = DateTime.UtcNow });
-});
-
+app.UseSwagger();
+app.UseSwaggerUI();
+app.UseCors("CPI");
+app.MapControllers();
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
