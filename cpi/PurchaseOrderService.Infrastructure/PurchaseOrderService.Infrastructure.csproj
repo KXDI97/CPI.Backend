@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- EF Core para persistencia -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Infra depende de Application y Domain -->
+    <ProjectReference Include="..\PurchaseOrderService.Application\PurchaseOrderService.Application.csproj" />
+    <ProjectReference Include="..\PurchaseOrderService.Domain\PurchaseOrderService.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
