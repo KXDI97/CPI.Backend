@@ -1,29 +1,44 @@
-using CatalogService.Application.Clients;
-using CatalogService.Infrastructure.Clients;
 using CatalogService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// DB
-builder.Services.AddDbContext<CpiDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("CpiSqlServer")));
+// CORS (ajusta al origen de tu front)
+const string CorsPolicy = "CpiCors";
+builder.Services.AddCors(opt =>
+{
+    opt.AddPolicy(CorsPolicy, p => p
+        .WithOrigins("http://localhost:5500", "http://127.0.0.1:5500", "http://localhost:5173") // agrega tu front
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials());
+});
 
-// DI
-builder.Services.AddScoped<IClientService, ClientService>();
+builder.Services.AddControllers()
+    .AddJsonOptions(o =>
+    {
+        // Mantener nombres tal cual (camelCase por default está bien para JS)
+        // o.JsonSerializerOptions.PropertyNamingPolicy = null;
+    });
 
-builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS para tu front
-builder.Services.AddCors(o => o.AddPolicy("CPI", p =>
-    p.WithOrigins("http://127.0.0.1:5500","http://localhost:5500")
-     .AllowAnyHeader().AllowAnyMethod()));
+// DbContext
+builder.Services.AddDbContext<CpiDbContext>(opt =>
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
-app.UseSwagger();
-app.UseSwaggerUI();
-app.UseCors("CPI");
+
+app.UseCors(CorsPolicy);
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseRouting();
 app.MapControllers();
+
 app.Run();
