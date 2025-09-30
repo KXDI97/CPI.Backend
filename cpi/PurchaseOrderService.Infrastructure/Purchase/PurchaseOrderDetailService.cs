@@ -5,48 +5,74 @@ using PurchaseOrderService.Infrastructure.Data;
 
 namespace PurchaseOrderService.Infrastructure.Purchase;
 
-public class PurchaseOrderService : IPurchaseOrderService
+public class PurchaseOrderDetailService : IPurchaseOrderDetailService
 {
     private readonly CpiDbContext _context;
 
-    public PurchaseOrderService(CpiDbContext context) => _context = context;
+    public PurchaseOrderDetailService(CpiDbContext context) => _context = context;
 
-    public async Task<IEnumerable<PurchaseOrderDto>> GetAllAsync(CancellationToken ct = default)
-        => await _context.PurchaseOrders
-            .Select(po => new PurchaseOrderDto(
-                po.PurchaseOrderId, po.OrderDate, po.SupplierId, po.Status
-            ))
+    public async Task<IEnumerable<PurchaseOrderDetailDto>> GetAllByOrderIdAsync(int purchaseOrderId, CancellationToken ct = default)
+        => await _context.PurchaseOrderDetails
+            .Where(d => d.PurchaseOrderId == purchaseOrderId)
+.Select(d => new PurchaseOrderDetailDto
+{
+    PurchaseOrderDetailId = d.PurchaseOrderDetailId,
+    PurchaseOrderId = d.PurchaseOrderId,
+    ProductId = d.ProductId,
+    Quantity = (int)d.Quantity,
+    UnitPrice = d.UnitPrice,
+    LineTotal = d.LineTotal
+})
+
             .ToListAsync(ct);
 
-    public async Task<PurchaseOrderDto?> GetByIdAsync(int id, CancellationToken ct = default)
-        => await _context.PurchaseOrders
-            .Where(po => po.PurchaseOrderId == id)
-            .Select(po => new PurchaseOrderDto(
-                po.PurchaseOrderId, po.OrderDate, po.SupplierId, po.Status
-            ))
+    public async Task<PurchaseOrderDetailDto?> GetByIdAsync(int id, CancellationToken ct = default)
+        => await _context.PurchaseOrderDetails
+            .Where(d => d.PurchaseOrderDetailId == id)
+            .Select(d => new PurchaseOrderDetailDto
+            {
+                PurchaseOrderDetailId = d.PurchaseOrderDetailId,
+                PurchaseOrderId = d.PurchaseOrderId,
+                ProductId = d.ProductId,
+                Quantity = (int)d.Quantity,
+                UnitPrice = d.UnitPrice,
+                LineTotal = d.LineTotal
+            })
             .FirstOrDefaultAsync(ct);
 
-    public async Task<PurchaseOrderDto> CreateAsync(CreatePurchaseOrderDto dto, CancellationToken ct = default)
+    public async Task<PurchaseOrderDetailDto> CreateAsync(CreatePurchaseOrderDetailDto dto, CancellationToken ct = default)
     {
-        var entity = new PurchaseOrder
+        var entity = new PurchaseOrderDetail
         {
-            SupplierId = dto.SupplierId,
-            OrderDate = dto.OrderDate,
-            Status = "Pendiente"
+            PurchaseOrderId = dto.PurchaseOrderId,
+            ProductId = dto.ProductId,
+            Quantity = dto.Quantity,
+            UnitPrice = dto.UnitPrice
         };
-        _context.PurchaseOrders.Add(entity);
+
+        _context.PurchaseOrderDetails.Add(entity);
         await _context.SaveChangesAsync(ct);
-        return new PurchaseOrderDto(entity.PurchaseOrderId, entity.OrderDate, entity.SupplierId, entity.Status);
+
+        return new PurchaseOrderDetailDto
+        {
+            PurchaseOrderDetailId = entity.PurchaseOrderDetailId,
+            PurchaseOrderId = entity.PurchaseOrderId,
+            ProductId = entity.ProductId,
+            Quantity = (int)entity.Quantity,
+            UnitPrice = entity.UnitPrice,
+            LineTotal = entity.LineTotal
+        };
+
     }
 
-    public async Task<bool> UpdateAsync(int id, UpdatePurchaseOrderDto dto, CancellationToken ct = default)
+    public async Task<bool> UpdateAsync(int id, UpdatePurchaseOrderDetailDto dto, CancellationToken ct = default)
     {
-        var entity = await _context.PurchaseOrders.FindAsync(new object[] { id }, ct);
+        var entity = await _context.PurchaseOrderDetails.FindAsync(new object[] { id }, ct);
         if (entity == null) return false;
 
-        entity.OrderDate = dto.OrderDate;
-        entity.SupplierId = dto.SupplierId;
-        entity.Status = dto.Status;
+        entity.ProductId = dto.ProductId;
+        entity.Quantity = dto.Quantity;
+        entity.UnitPrice = dto.UnitPrice;
 
         await _context.SaveChangesAsync(ct);
         return true;
@@ -54,10 +80,10 @@ public class PurchaseOrderService : IPurchaseOrderService
 
     public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
     {
-        var entity = await _context.PurchaseOrders.FindAsync(new object[] { id }, ct);
+        var entity = await _context.PurchaseOrderDetails.FindAsync(new object[] { id }, ct);
         if (entity == null) return false;
 
-        _context.PurchaseOrders.Remove(entity);
+        _context.PurchaseOrderDetails.Remove(entity);
         await _context.SaveChangesAsync(ct);
         return true;
     }

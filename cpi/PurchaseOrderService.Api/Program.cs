@@ -12,6 +12,7 @@ builder.Services.AddDbContext<CpiDbContext>(opt =>
 // DI
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService.Infrastructure.Purchase.PurchaseOrderService>();
 builder.Services.AddScoped<IPurchaseOrderDetailService, PurchaseOrderService.Infrastructure.Purchase.PurchaseOrderDetailService>();
+builder.Services.AddScoped<ILogicalCostService, LogicalCostService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
