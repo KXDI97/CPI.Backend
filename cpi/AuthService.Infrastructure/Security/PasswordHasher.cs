@@ -1,30 +1,20 @@
+// AuthService.Infrastructure/Security/PasswordHasher.cs
 using System.Security.Cryptography;
 
 namespace AuthService.Infrastructure.Security;
 
 public static class PasswordHasher
 {
-    public static void CreateHash(string password, out byte[] hash, out byte[] salt, int iterations = 120_000)
+    public static (byte[] Hash, byte[] Salt) Hash(string password)
     {
-        salt = RandomNumberGenerator.GetBytes(16);
-
-        hash = Rfc2898DeriveBytes.Pbkdf2(
-            password,
-            salt,
-            iterations,
-            HashAlgorithmName.SHA256,
-            32); // 32 bytes = 256 bits
+        byte[] salt = RandomNumberGenerator.GetBytes(16); // 16 bytes
+        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100_000, HashAlgorithmName.SHA256);
+        return (pbkdf2.GetBytes(32), salt); // 32 bytes
     }
 
-    public static bool Verify(string password, byte[] salt, byte[] hash, int iterations = 120_000)
+    public static bool Verify(string password, byte[] hash, byte[] salt)
     {
-        var testHash = Rfc2898DeriveBytes.Pbkdf2(
-            password,
-            salt,
-            iterations,
-            HashAlgorithmName.SHA256,
-            32);
-
-        return CryptographicOperations.FixedTimeEquals(testHash, hash);
+        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100_000, HashAlgorithmName.SHA256);
+        return CryptographicOperations.FixedTimeEquals(hash, pbkdf2.GetBytes(32));
     }
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Aquí casi nunca hay paquetes externos, solo DTOs e Interfaces -->
+    <!-- Aqu� casi nunca hay paquetes externos, solo DTOs e Interfaces -->
   </ItemGroup>
 
 </Project>
