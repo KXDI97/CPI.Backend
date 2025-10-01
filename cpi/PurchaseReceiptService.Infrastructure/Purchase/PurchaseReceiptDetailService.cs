@@ -33,20 +33,27 @@ public class PurchaseReceiptDetailService : IPurchaseReceiptDetailService
     }
 
     public async Task<PurchaseReceiptDetailDto> CreateAsync(CreatePurchaseReceiptDetailDto dto, CancellationToken ct = default)
+{
+    var entity = new PurchaseReceiptDetail
     {
-        var entity = new PurchaseReceiptDetail
-        {
-            ReceiptId = dto.ReceiptId,
-            ProductId = dto.ProductId,
-            QuantityReceived = dto.QuantityReceived,
-            UnitCost = dto.UnitCost
-        };
+        ReceiptId = dto.ReceiptId,
+        ProductId = dto.ProductId,
+        QuantityReceived = dto.QuantityReceived,
+        UnitCost = dto.UnitCost
+    };
 
-        _db.PurchaseReceiptDetails.Add(entity);
-        await _db.SaveChangesAsync(ct);
+    _db.PurchaseReceiptDetails.Add(entity);
+    await _db.SaveChangesAsync(ct);
 
-        return new PurchaseReceiptDetailDto(entity.ReceiptDetailId, entity.ReceiptId, entity.ProductId, entity.QuantityReceived, entity.UnitCost);
-    }
+    // Recuperamos el último ID insertado para ese ReceiptId y ProductId
+    var insertedId = await _db.PurchaseReceiptDetails
+        .Where(d => d.ReceiptId == dto.ReceiptId && d.ProductId == dto.ProductId)
+        .OrderByDescending(d => d.ReceiptDetailId)
+        .Select(d => d.ReceiptDetailId)
+        .FirstOrDefaultAsync(ct);
+
+    return new PurchaseReceiptDetailDto(insertedId, entity.ReceiptId, entity.ProductId, entity.QuantityReceived, entity.UnitCost);
+}
 
     public async Task<bool> UpdateAsync(int id, UpdatePurchaseReceiptDetailDto dto, CancellationToken ct = default)
     {

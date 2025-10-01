@@ -8,20 +8,20 @@ namespace PurchaseReceiptService.Application.Purchase;
 public record PurchaseReceiptDetailDto(
     int ReceiptDetailId,
     int ReceiptId,
-    int ProductId,
-    int QuantityReceived,
+    string ProductId,
+    decimal QuantityReceived,
     decimal UnitCost
 );
 
 public record CreatePurchaseReceiptDetailDto(
     int ReceiptId,
-    int ProductId,
-    int QuantityReceived,
+    string ProductId,
+    decimal QuantityReceived,
     decimal UnitCost
 );
 
 public record UpdatePurchaseReceiptDetailDto(
-    int ProductId,
-    int QuantityReceived,
+    string ProductId,
+    decimal QuantityReceived,
     decimal UnitCost
 );
