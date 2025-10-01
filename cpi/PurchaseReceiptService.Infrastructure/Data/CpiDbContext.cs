@@ -30,19 +30,32 @@ public class CpiDbContext : DbContext
             e.Property(x => x.PurchaseOrderId).IsRequired();
         });
 
-        modelBuilder.Entity<PurchaseReceiptDetail>(e =>
-        {
-            e.ToTable("PurchaseReceiptDetails");
-            e.HasKey(x => x.ReceiptDetailId);
+modelBuilder.Entity<PurchaseReceiptDetail>(entity =>
+{
+    entity.ToTable("PurchaseReceiptDetails", tableBuilder =>
+    {
+        // 🚀 Esto desactiva el OUTPUT clause para esta tabla
+        tableBuilder.UseSqlOutputClause(false);
+    });
 
-            e.Property(x => x.ProductId).HasMaxLength(50).IsRequired();
-            e.Property(x => x.QuantityReceived).HasPrecision(18, 4).IsRequired();
-            e.Property(x => x.UnitCost).HasPrecision(19, 4).IsRequired();
+    entity.HasKey(x => x.ReceiptDetailId);
 
-            e.HasOne<PurchaseReceipt>()
-             .WithMany(r => r.Details)
-             .HasForeignKey(d => d.ReceiptId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
+    entity.Property(x => x.ProductId)
+          .HasMaxLength(50)
+          .IsRequired();
+
+    entity.Property(x => x.QuantityReceived)
+          .HasPrecision(18, 4)
+          .IsRequired();
+
+    entity.Property(x => x.UnitCost)
+          .HasPrecision(19, 4)
+          .IsRequired();
+
+    entity.HasOne<PurchaseReceipt>()
+          .WithMany(r => r.Details)
+          .HasForeignKey(d => d.ReceiptId)
+          .OnDelete(DeleteBehavior.Cascade);
+});
     }
 }
