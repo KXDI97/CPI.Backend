@@ -34,7 +34,7 @@ modelBuilder.Entity<PurchaseReceiptDetail>(entity =>
 {
     entity.ToTable("PurchaseReceiptDetails", tableBuilder =>
     {
-        // 🚀 Esto desactiva el OUTPUT clause para esta tabla
+        //Esto es para desactiva el OUTPUT clause para esta tabla
         tableBuilder.UseSqlOutputClause(false);
     });
 
