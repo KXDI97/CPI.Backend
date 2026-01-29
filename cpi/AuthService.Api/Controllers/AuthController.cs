@@ -16,23 +16,31 @@ public class AuthController : ControllerBase
     private readonly TokenService _tokens;
 
     public AuthController(AuthDbContext db, TokenService tokens)
-    { _db = db; _tokens = tokens; }
+    {
+        _db = db;
+        _tokens = tokens;
+    }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest r)
     {
+        var role = string.IsNullOrWhiteSpace(r.Role) ? "Viewer" : r.Role.Trim();
+
         if (await _db.Users.AnyAsync(u => u.Username == r.Username || u.Email == r.Email))
             return Conflict("Username o Email ya existen.");
 
-        PasswordHasher.CreateHash(r.Password, out var hash, out var salt);
+var (hash, salt) = PasswordHasher.Hash(r.Password);
+
+
         var user = new User
         {
-            Username = r.Username,
-            Email = r.Email,
-            Role = r.Role,
+            Username = r.Username.Trim(),
+            Email = r.Email.Trim(),
+            Role = role,
             PasswordHash = hash,
             PasswordSalt = salt
         };
+
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
@@ -44,37 +52,29 @@ public class AuthController : ControllerBase
     {
         var u = await _db.Users.FirstOrDefaultAsync(x =>
             x.Username == r.UsernameOrEmail || x.Email == r.UsernameOrEmail);
-        if (u is null || u.PasswordSalt is null || u.PasswordHash is null)
+
+        if (u is null || u.PasswordHash is null || u.PasswordSalt is null)
             return Unauthorized("Credenciales inválidas.");
 
-        if (!PasswordHasher.Verify(r.Password, u.PasswordSalt, u.PasswordHash))
-            return Unauthorized("Credenciales inválidas.");
+if (!PasswordHasher.Verify(r.Password, u.PasswordHash, u.PasswordSalt))
+    return Unauthorized("Credenciales inválidas.");
+
 
         var token = _tokens.Create(u, TimeSpan.FromHours(8));
-        return new AuthResponse(token, DateTime.UtcNow.AddHours(8), u.ID, u.Username, u.Email, u.Role);
+
+        return new AuthResponse(token, u.Username, u.Email, u.Role);
     }
 
     [Authorize]
     [HttpGet("me")]
-    public IActionResult Me() =>
-        Ok(new
+    public IActionResult Me()
+    {
+        return Ok(new
         {
             Id = User.FindFirst("sub")?.Value,
-            Username = User.Identity?.Name ?? User.FindFirst("unique_name")?.Value,
+            Username = User.Identity?.Name,
             Email = User.FindFirst("email")?.Value,
             Role = User.FindFirst("role")?.Value
         });
-
-    [ApiController]
-    [Route("health")]
-    public class HealthController : ControllerBase
-    {
-        private readonly AuthDbContext _db;
-        public HealthController(AuthDbContext db) => _db = db;
-
-        [HttpGet("db")]
-        public async Task<IActionResult> Db() =>
-            await _db.Database.CanConnectAsync() ? Ok("DB OK") : StatusCode(500, "DB FAIL");
     }
-
 }

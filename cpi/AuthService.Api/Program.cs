@@ -6,6 +6,8 @@ using Microsoft.IdentityModel.Tokens;
 using AuthService.Infrastructure.Security;
 using AuthService.Infrastructure.Data;
 using AuthService.Api.Contracts; 
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt; // JwtRegisteredClaimNames
 
 
 
@@ -82,13 +84,15 @@ app.MapPost("/api/auth/login", async (AuthDbContext db, IConfiguration cfg, Logi
         !PasswordHasher.Verify(req.Password, user.PasswordHash, user.PasswordSalt))
         return Results.Unauthorized();
 
-    var claims = new[]
-    {
-        new System.Security.Claims.Claim("sub", user.ID.ToString()),
-        new System.Security.Claims.Claim("name", user.Username),
-        new System.Security.Claims.Claim("email", user.Email),
-        new System.Security.Claims.Claim("role", user.Role)
-    };
+var claims = new[]
+{
+    new Claim(JwtRegisteredClaimNames.Sub, user.ID.ToString()),
+    new Claim(ClaimTypes.Name, user.Username),
+    new Claim(ClaimTypes.Email, user.Email),
+    new Claim(ClaimTypes.Role, user.Role)
+};
+
+
     var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
     var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
         issuer: cfg["Jwt:Issuer"],
