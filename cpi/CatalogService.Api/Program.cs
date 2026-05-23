@@ -1,32 +1,27 @@
-using CatalogService.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
+using CatalogService.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// CORS (ajusta al origen de tu front)
+// CORS
 const string CorsPolicy = "CpiCors";
 builder.Services.AddCors(opt =>
 {
     opt.AddPolicy(CorsPolicy, p => p
-        .WithOrigins("http://localhost:5500", "http://127.0.0.1:5500", "http://localhost:5173") // agrega tu front
+        .WithOrigins(
+            "http://localhost:5500",
+            "http://127.0.0.1:5500",
+            "http://localhost:5173")
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials());
 });
 
-builder.Services.AddControllers()
-    .AddJsonOptions(o =>
-    {
-        // Mantener nombres tal cual (camelCase por default está bien para JS)
-        // o.JsonSerializerOptions.PropertyNamingPolicy = null;
-    });
-
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// DbContext
-builder.Services.AddDbContext<CpiDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Infrastructure (DbContext + servicios)
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
