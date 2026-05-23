@@ -3,7 +3,7 @@ using CatalogService.Domain.Entities;
 using CatalogService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace CatalogService.Infrastructure.Clients;
+namespace CatalogService.Infrastructure.Services;
 
 
 public class ClientService : IClientService

@@ -1,8 +1,7 @@
-using CatalogService.Infrastructure;
+using SalesService.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// CORS
 const string CorsPolicy = "CpiCors";
 builder.Services.AddCors(opt =>
 {
@@ -20,7 +19,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Infrastructure (DbContext + servicios)
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
