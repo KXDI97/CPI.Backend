@@ -8,4 +8,5 @@ public class User
     public string Role { get; set; } = "Viewer";
     public byte[]? PasswordHash { get; set; }
     public byte[]? PasswordSalt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

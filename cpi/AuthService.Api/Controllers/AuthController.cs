@@ -44,7 +44,7 @@ var (hash, salt) = PasswordHasher.Hash(r.Password);
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(Me), new { }, new { user.ID, user.Username, user.Email, user.Role });
+        return Created($"/api/users/{user.ID}", new UserResponse(user.ID, user.Username, user.Email, user.Role, user.CreatedAt));
     }
 
     [HttpPost("login")]

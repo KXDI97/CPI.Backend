@@ -11,16 +11,21 @@ public class AuthDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
-        mb.HasDefaultSchema("dbo");
         mb.Entity<User>(b =>
         {
-            b.ToTable("Users", "dbo");
+            b.ToTable("users");
             b.HasKey(x => x.ID);
-            b.Property(x => x.Username).HasMaxLength(50).IsRequired();
-            b.Property(x => x.Email).HasMaxLength(100).IsRequired();
-            b.Property(x => x.Role).HasMaxLength(10).IsRequired();
-            b.Property(x => x.PasswordHash).HasColumnType("varbinary(256)");
-            b.Property(x => x.PasswordSalt).HasColumnType("varbinary(128)");
+            b.Property(x => x.ID).HasColumnName("id");
+            b.Property(x => x.Username).HasColumnName("username").HasMaxLength(50).IsRequired();
+            b.Property(x => x.Email).HasColumnName("email").HasMaxLength(100).IsRequired();
+            b.Property(x => x.Role).HasColumnName("role").HasMaxLength(20).IsRequired();
+            b.Property(x => x.PasswordHash).HasColumnName("password_hash");
+            b.Property(x => x.PasswordSalt).HasColumnName("password_salt");
+            b.Property(x => x.CreatedAt)
+             .HasColumnName("created_at")
+             .HasColumnType("timestamp with time zone")
+             .HasDefaultValueSql("now()")
+             .ValueGeneratedOnAdd();
             b.HasIndex(x => x.Username).IsUnique();
             b.HasIndex(x => x.Email).IsUnique();
         });
