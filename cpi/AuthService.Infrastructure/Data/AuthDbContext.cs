@@ -13,18 +13,18 @@ public class AuthDbContext : DbContext
     {
         mb.Entity<User>(b =>
         {
-            b.ToTable("users");
+            b.ToTable("Users");
             b.HasKey(x => x.ID);
-            b.Property(x => x.ID).HasColumnName("id");
-            b.Property(x => x.Username).HasColumnName("username").HasMaxLength(50).IsRequired();
-            b.Property(x => x.Email).HasColumnName("email").HasMaxLength(100).IsRequired();
-            b.Property(x => x.Role).HasColumnName("role").HasMaxLength(20).IsRequired();
-            b.Property(x => x.PasswordHash).HasColumnName("password_hash");
-            b.Property(x => x.PasswordSalt).HasColumnName("password_salt");
+            b.Property(x => x.ID).HasColumnName("ID");
+            b.Property(x => x.Username).HasColumnName("Username").HasMaxLength(50).IsRequired();
+            b.Property(x => x.Email).HasColumnName("Email").HasMaxLength(100).IsRequired();
+            b.Property(x => x.Role).HasColumnName("Role").HasMaxLength(20).IsRequired();
+            b.Property(x => x.PasswordHash).HasColumnName("PasswordHash");
+            b.Property(x => x.PasswordSalt).HasColumnName("PasswordSalt");
             b.Property(x => x.CreatedAt)
-             .HasColumnName("created_at")
+             .HasColumnName("CreatedAt")
              .HasColumnType("timestamp with time zone")
-             .HasDefaultValueSql("now()")
+             .HasDefaultValueSql("NOW()")
              .ValueGeneratedOnAdd();
             b.HasIndex(x => x.Username).IsUnique();
             b.HasIndex(x => x.Email).IsUnique();

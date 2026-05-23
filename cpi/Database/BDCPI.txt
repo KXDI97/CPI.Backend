@@ -1,0 +1,365 @@
+/* ============================================================
+   Proyecto CPI – Esquema de Base de Datos (SQL Server)
+   Versión: 1.0 (unificada, corregida y endurecida)
+   ============================================================ */
+
+SET NOCOUNT ON;
+GO
+
+/* ------------------------------------------------------------
+   Limpieza segura (si estás rehaciendo desde cero)
+   ¡OJO! Esto elimina objetos si existen.
+   ------------------------------------------------------------ */
+IF OBJECT_ID('dbo.tr_PurchaseReceiptDetails_MoveStock', 'TR') IS NOT NULL DROP TRIGGER dbo.tr_PurchaseReceiptDetails_MoveStock;
+IF OBJECT_ID('dbo.tr_SalesDetails_MoveStock', 'TR') IS NOT NULL DROP TRIGGER dbo.tr_SalesDetails_MoveStock;
+IF OBJECT_ID('dbo.v_CurrentStock', 'V') IS NOT NULL DROP VIEW dbo.v_CurrentStock;
+IF OBJECT_ID('dbo.v_SalesLines', 'V') IS NOT NULL DROP VIEW dbo.v_SalesLines;
+IF OBJECT_ID('dbo.v_SalesSummary', 'V') IS NOT NULL DROP VIEW dbo.v_SalesSummary;
+IF OBJECT_ID('dbo.sp_Sales_RecalculateTotals', 'P') IS NOT NULL DROP PROCEDURE dbo.sp_Sales_RecalculateTotals;
+
+IF OBJECT_ID('dbo.InventoryMovements', 'U') IS NOT NULL DROP TABLE dbo.InventoryMovements;
+IF OBJECT_ID('dbo.PurchaseReceiptDetails', 'U') IS NOT NULL DROP TABLE dbo.PurchaseReceiptDetails;
+IF OBJECT_ID('dbo.PurchaseReceipts', 'U') IS NOT NULL DROP TABLE dbo.PurchaseReceipts;
+IF OBJECT_ID('dbo.SalesDetails', 'U') IS NOT NULL DROP TABLE dbo.SalesDetails;
+IF OBJECT_ID('dbo.Sales', 'U') IS NOT NULL DROP TABLE dbo.Sales;
+IF OBJECT_ID('dbo.Transactions', 'U') IS NOT NULL DROP TABLE dbo.Transactions;
+IF OBJECT_ID('dbo.LogicalCosts', 'U') IS NOT NULL DROP TABLE dbo.LogicalCosts;
+IF OBJECT_ID('dbo.PurchaseOrderDetails', 'U') IS NOT NULL DROP TABLE dbo.PurchaseOrderDetails;
+IF OBJECT_ID('dbo.PurchaseOrders', 'U') IS NOT NULL DROP TABLE dbo.PurchaseOrders;
+IF OBJECT_ID('dbo.Products', 'U') IS NOT NULL DROP TABLE dbo.Products;
+IF OBJECT_ID('dbo.Clients', 'U') IS NOT NULL DROP TABLE dbo.Clients;
+IF OBJECT_ID('dbo.Suppliers', 'U') IS NOT NULL DROP TABLE dbo.Suppliers;
+IF OBJECT_ID('dbo.Users', 'U') IS NOT NULL DROP TABLE dbo.Users;
+GO
+
+/* ------------------------------------------------------------
+   Users (endurecido: no guardar contraseñas en claro)
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.Users (
+    ID            INT IDENTITY(1,1) PRIMARY KEY,
+    Username      NVARCHAR(50)  NOT NULL,
+    Email         NVARCHAR(100) NOT NULL,
+    Role          NVARCHAR(10)  NOT NULL,  -- Admin | Seller | Viewer
+    PasswordHash  VARBINARY(256) NULL,
+    PasswordSalt  VARBINARY(128) NULL,
+    CONSTRAINT UQ_Users_Username UNIQUE (Username),
+    CONSTRAINT UQ_Users_Email    UNIQUE (Email),
+    CONSTRAINT CK_Users_Role     CHECK (Role IN (N'Admin', N'Seller', N'Viewer'))
+);
+GO
+
+/* ------------------------------------------------------------
+   Suppliers
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.Suppliers (
+    SupplierId INT IDENTITY(1,1) PRIMARY KEY,
+    Name       NVARCHAR(100) NOT NULL,
+    Contact    NVARCHAR(100) NULL,
+    Phone      NVARCHAR(20)  NULL,
+    Email      NVARCHAR(100) NULL,
+    Address    NVARCHAR(255) NULL
+);
+GO
+
+/* ------------------------------------------------------------
+   Clients (arreglado UQ: DocumentType + DocumentID)
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.Clients (
+    ClientId      INT IDENTITY(1,1) PRIMARY KEY,
+    Name          NVARCHAR(150) NOT NULL,
+    ClientType    NVARCHAR(20)  NOT NULL CONSTRAINT DF_Clients_ClientType DEFAULT (N'Empresa'),
+    DocumentType  NVARCHAR(20)  NOT NULL CONSTRAINT DF_Clients_DocumentType DEFAULT (N'RUT'),
+    DocumentID    NVARCHAR(40)  NOT NULL,
+    Email         NVARCHAR(100) NULL,
+    Phone         NVARCHAR(30)  NULL,
+    Website       NVARCHAR(150) NULL,
+    Address       NVARCHAR(255) NULL,
+    CONSTRAINT UQ_Clients_Doc UNIQUE (DocumentType, DocumentID)
+);
+GO
+
+/* ------------------------------------------------------------
+   Products (referencia a Suppliers)
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.Products (
+    ProductId   NVARCHAR(50)  NOT NULL PRIMARY KEY,
+    Name        NVARCHAR(100) NOT NULL,
+    Value       DECIMAL(19,4) NOT NULL,   -- 19,4 para seguridad en importes
+    Category    NVARCHAR(50)  NOT NULL,
+    Description NVARCHAR(255) NOT NULL,
+    Stock       DECIMAL(18,4) NOT NULL CONSTRAINT DF_Products_Stock DEFAULT(0),
+    SupplierId  INT NOT NULL,
+    CONSTRAINT FK_Products_Suppliers FOREIGN KEY (SupplierId)
+        REFERENCES dbo.Suppliers(SupplierId)
+);
+GO
+
+/* ------------------------------------------------------------
+   Purchase Orders y Detalles
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.PurchaseOrders (
+    PurchaseOrderId INT IDENTITY(1,1) PRIMARY KEY,
+    SupplierId      INT NOT NULL,
+    OrderDate       DATETIME2 NOT NULL CONSTRAINT DF_PurchaseOrders_Date DEFAULT (SYSUTCDATETIME()),
+    Status          NVARCHAR(20) NOT NULL, -- Pendiente | Recibida | Cancelada
+    CONSTRAINT FK_PurchaseOrders_Suppliers FOREIGN KEY (SupplierId)
+        REFERENCES dbo.Suppliers(SupplierId)
+);
+GO
+
+CREATE TABLE dbo.PurchaseOrderDetails (
+    PurchaseOrderDetailId INT IDENTITY(1,1) PRIMARY KEY,
+    PurchaseOrderId       INT NOT NULL,
+    ProductId             NVARCHAR(50) NOT NULL,
+    Quantity              DECIMAL(18,4) NOT NULL,
+    UnitPrice             DECIMAL(19,4) NOT NULL,
+    LineTotal             AS (CAST(Quantity AS DECIMAL(19,4)) * UnitPrice) PERSISTED,
+    CONSTRAINT FK_POD_PO  FOREIGN KEY (PurchaseOrderId) REFERENCES dbo.PurchaseOrders(PurchaseOrderId),
+    CONSTRAINT FK_POD_P   FOREIGN KEY (ProductId)       REFERENCES dbo.Products(ProductId),
+    CONSTRAINT CK_POD_Qty   CHECK (Quantity > 0),
+    CONSTRAINT CK_POD_Price CHECK (UnitPrice >= 0)
+);
+GO
+
+/* ------------------------------------------------------------
+   Costos logísticos (conservamos el nombre LogicalCosts)
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.LogicalCosts(
+    Order_Number           INT NOT NULL PRIMARY KEY,
+    International_Transport DECIMAL(19,4) NOT NULL,
+    Local_Transport         DECIMAL(19,4) NOT NULL,
+    Nationalization         DECIMAL(19,4) NOT NULL,
+    Cargo_Insurance         DECIMAL(19,4) NOT NULL,
+    Storage                 DECIMAL(19,4) NOT NULL,
+    Others                  DECIMAL(19,4) NOT NULL
+);
+GO
+
+/* ------------------------------------------------------------
+   Transactions (separado de LogicalCosts para evitar doble FK)
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.Transactions(
+    Transaction_Number  INT IDENTITY(1,1) PRIMARY KEY,
+    PurchaseOrderId     INT NOT NULL,         -- FK única y clara
+    Invoice_Number      NVARCHAR(50) NOT NULL,
+    Reminder            NVARCHAR(100) NULL,
+    Transaction_Status  NVARCHAR(20) NOT NULL,  -- Pagado | Pendiente | Parcial
+    Payment_Date        DATE NULL,              -- NULL si pendiente
+    CONSTRAINT FK_Transactions_PO FOREIGN KEY (PurchaseOrderId)
+        REFERENCES dbo.PurchaseOrders(PurchaseOrderId)
+    -- Si requieres enlazar a LogicalCosts, agrega Order_Number y su FK en otra columna
+);
+GO
+
+/* ------------------------------------------------------------
+   Ventas (Sales) y Detalles
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.Sales (
+    InvoiceId    INT IDENTITY(1,1) PRIMARY KEY,
+    ClientId     INT NOT NULL,
+    InvoiceDate  DATETIME2 NOT NULL CONSTRAINT DF_Sales_Date DEFAULT (SYSUTCDATETIME()),
+    Status       NVARCHAR(20) NOT NULL CONSTRAINT DF_Sales_Status DEFAULT (N'Emitida'),
+    ExchangeRate DECIMAL(18,4) NULL,  -- TRM del día (si aplica)
+    Subtotal     DECIMAL(19,4) NOT NULL CONSTRAINT DF_Sales_Subtotal DEFAULT (0),
+    Tax          DECIMAL(19,4) NOT NULL CONSTRAINT DF_Sales_Tax DEFAULT (0),
+    Total        DECIMAL(19,4) NOT NULL CONSTRAINT DF_Sales_Total DEFAULT (0),
+    CONSTRAINT FK_Sales_Clients FOREIGN KEY (ClientId) REFERENCES dbo.Clients(ClientId)
+);
+GO
+
+CREATE TABLE dbo.SalesDetails (
+    InvoiceDetailId INT IDENTITY(1,1) PRIMARY KEY,
+    InvoiceId       INT NOT NULL,
+    ProductId       NVARCHAR(50) NOT NULL,
+    Quantity        DECIMAL(18,4) NOT NULL,
+    UnitPrice       DECIMAL(19,4) NOT NULL,
+    LineTotal       AS (CAST(Quantity AS DECIMAL(19,4)) * UnitPrice) PERSISTED,
+    CONSTRAINT FK_SalesDetails_Sales    FOREIGN KEY (InvoiceId) REFERENCES dbo.Sales(InvoiceId),
+    CONSTRAINT FK_SalesDetails_Products FOREIGN KEY (ProductId) REFERENCES dbo.Products(ProductId),
+    CONSTRAINT CK_SalesDetails_Qty   CHECK (Quantity > 0),
+    CONSTRAINT CK_SalesDetails_Price CHECK (UnitPrice >= 0)
+);
+GO
+
+/* ------------------------------------------------------------
+   Recepción de compras (para mover inventario cuando llega)
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.PurchaseReceipts(
+    ReceiptId       INT IDENTITY(1,1) PRIMARY KEY,
+    PurchaseOrderId INT NOT NULL,
+    ReceiptDate     DATETIME2 NOT NULL CONSTRAINT DF_PR_Date DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT FK_PR_PO FOREIGN KEY (PurchaseOrderId) REFERENCES dbo.PurchaseOrders(PurchaseOrderId)
+);
+GO
+
+CREATE TABLE dbo.PurchaseReceiptDetails(
+    ReceiptDetailId    INT IDENTITY(1,1) PRIMARY KEY,
+    ReceiptId          INT NOT NULL,
+    ProductId          NVARCHAR(50) NOT NULL,
+    QuantityReceived   DECIMAL(18,4) NOT NULL,
+    UnitCost           DECIMAL(19,4) NOT NULL,
+    CONSTRAINT FK_PRD_R  FOREIGN KEY (ReceiptId) REFERENCES dbo.PurchaseReceipts(ReceiptId),
+    CONSTRAINT FK_PRD_P  FOREIGN KEY (ProductId) REFERENCES dbo.Products(ProductId),
+    CONSTRAINT CK_PRD_Qty   CHECK (QuantityReceived > 0),
+    CONSTRAINT CK_PRD_Cost  CHECK (UnitCost >= 0)
+);
+GO
+
+/* ------------------------------------------------------------
+   Movimientos de inventario (auditable)
+   ------------------------------------------------------------ */
+CREATE TABLE dbo.InventoryMovements(
+    MovementId  INT IDENTITY(1,1) PRIMARY KEY,
+    ProductId   NVARCHAR(50) NOT NULL,
+    QtyChange   DECIMAL(18,4) NOT NULL,   -- + entra, - sale
+    SourceType  NVARCHAR(20) NOT NULL,    -- Sale | PurchaseReceipt | Adjust
+    SourceId    INT NULL,
+    CreatedAt   DATETIME2 NOT NULL CONSTRAINT DF_IM_CreatedAt DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_IM_Products FOREIGN KEY (ProductId) REFERENCES dbo.Products(ProductId)
+);
+GO
+
+/* ------------------------------------------------------------
+   SP de recalcular totales (con TRM opcional)
+   ------------------------------------------------------------ */
+CREATE OR ALTER PROCEDURE dbo.sp_Sales_RecalculateTotals
+    @InvoiceId    INT,
+    @ExchangeRate DECIMAL(18,4) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE s
+    SET s.Subtotal     = x.SumLineTotal,
+        s.Tax          = 0,  -- ajusta si manejas IVA (ej: x.SumLineTotal * 0.19)
+        s.Total        = x.SumLineTotal,
+        s.ExchangeRate = ISNULL(@ExchangeRate, s.ExchangeRate)
+    FROM dbo.Sales s
+    CROSS APPLY (
+        SELECT ISNULL(SUM(sd.LineTotal), 0) AS SumLineTotal
+        FROM dbo.SalesDetails sd
+        WHERE sd.InvoiceId = s.InvoiceId
+    ) x
+    WHERE s.InvoiceId = @InvoiceId;
+END
+GO
+
+/* ------------------------------------------------------------
+   Triggers de inventario (venta y recepción)
+   ------------------------------------------------------------ */
+CREATE OR ALTER TRIGGER dbo.tr_SalesDetails_MoveStock
+ON dbo.SalesDetails
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Salidas por INSERT/UPDATE (nueva cantidad)
+    INSERT INTO dbo.InventoryMovements(ProductId, QtyChange, SourceType, SourceId)
+    SELECT i.ProductId, -i.Quantity, N'Sale', i.InvoiceId
+    FROM inserted i;
+
+    -- Reverso por DELETE/UPDATE (cantidad anterior)
+    INSERT INTO dbo.InventoryMovements(ProductId, QtyChange, SourceType, SourceId)
+    SELECT d.ProductId, +d.Quantity, N'Sale', d.InvoiceId
+    FROM deleted d;
+
+    ;WITH s AS (
+        SELECT ProductId, SUM(QtyChange) AS StockCalc
+        FROM dbo.InventoryMovements
+        GROUP BY ProductId
+    )
+    UPDATE p SET p.Stock = s.StockCalc
+    FROM dbo.Products p
+    JOIN s ON s.ProductId = p.ProductId;
+END
+GO
+
+CREATE OR ALTER TRIGGER dbo.tr_PurchaseReceiptDetails_MoveStock
+ON dbo.PurchaseReceiptDetails
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Entradas por INSERT/UPDATE (nueva cantidad)
+    INSERT INTO dbo.InventoryMovements(ProductId, QtyChange, SourceType, SourceId)
+    SELECT i.ProductId, +i.QuantityReceived, N'PurchaseReceipt', i.ReceiptId
+    FROM inserted i;
+
+    -- Reverso por DELETE/UPDATE (cantidad anterior)
+    INSERT INTO dbo.InventoryMovements(ProductId, QtyChange, SourceType, SourceId)
+    SELECT d.ProductId, -d.QuantityReceived, N'PurchaseReceipt', d.ReceiptId
+    FROM deleted d;
+
+    ;WITH s AS (
+        SELECT ProductId, SUM(QtyChange) AS StockCalc
+        FROM dbo.InventoryMovements
+        GROUP BY ProductId
+    )
+    UPDATE p SET p.Stock = s.StockCalc
+    FROM dbo.Products p
+    JOIN s ON s.ProductId = p.ProductId;
+END
+GO
+
+/* ------------------------------------------------------------
+   Vistas de reporte
+   ------------------------------------------------------------ */
+CREATE OR ALTER VIEW dbo.v_SalesSummary AS
+SELECT
+  s.InvoiceId, s.InvoiceDate, s.Status,
+  c.Name AS ClientName, c.DocumentType, c.DocumentID,
+  s.Subtotal, s.Tax, s.Total, s.ExchangeRate
+FROM dbo.Sales s
+JOIN dbo.Clients c ON c.ClientId = s.ClientId;
+GO
+
+CREATE OR ALTER VIEW dbo.v_SalesLines AS
+SELECT
+  s.InvoiceId, s.InvoiceDate, c.Name AS ClientName,
+  d.ProductId, p.Name AS ProductName, d.Quantity, d.UnitPrice, d.LineTotal
+FROM dbo.SalesDetails d
+JOIN dbo.Sales s   ON s.InvoiceId  = d.InvoiceId
+JOIN dbo.Products p ON p.ProductId = d.ProductId
+JOIN dbo.Clients c  ON c.ClientId  = s.ClientId;
+GO
+
+CREATE OR ALTER VIEW dbo.v_CurrentStock AS
+SELECT
+  p.ProductId, p.Name,
+  COALESCE(SUM(m.QtyChange), 0) AS Stock
+FROM dbo.Products p
+LEFT JOIN dbo.InventoryMovements m ON m.ProductId = p.ProductId
+GROUP BY p.ProductId, p.Name;
+GO
+
+/* ------------------------------------------------------------
+   Índices recomendados
+   ------------------------------------------------------------ */
+-- Compras
+CREATE INDEX IX_PurchaseOrders_SupplierId       ON dbo.PurchaseOrders(SupplierId);
+CREATE INDEX IX_PurchaseOrderDetails_POId       ON dbo.PurchaseOrderDetails(PurchaseOrderId);
+CREATE INDEX IX_PurchaseOrderDetails_ProductId  ON dbo.PurchaseOrderDetails(ProductId);
+CREATE INDEX IX_Products_SupplierId             ON dbo.Products(SupplierId);
+
+-- Ventas
+CREATE INDEX IX_Sales_ClientId                  ON dbo.Sales(ClientId);
+CREATE INDEX IX_Sales_InvoiceDate               ON dbo.Sales(InvoiceDate);
+CREATE INDEX IX_SalesDetails_InvoiceId          ON dbo.SalesDetails(InvoiceId);
+CREATE INDEX IX_SalesDetails_ProductId          ON dbo.SalesDetails(ProductId);
+
+-- Pagos
+CREATE INDEX IX_Transactions_PO_Status_PDate    ON dbo.Transactions(PurchaseOrderId, Transaction_Status, Payment_Date);
+GO
+
+/* ------------------------------------------------------------
+   Notas de uso
+   ------------------------------------------------------------
+   - Para guardar la TRM por factura: pasa @ExchangeRate cuando insertes/actualices:
+       EXEC dbo.sp_Sales_RecalculateTotals @InvoiceId = 1, @ExchangeRate = 4050.1234;
+   - Si manejas IVA, ajusta el cálculo de Tax en el SP.
+   - Los triggers mantienen Products.Stock en sincronía auditando en InventoryMovements.
+   - Para costos logísticos, llena dbo.LogicalCosts(Order_Number) con la misma
+     PurchaseOrderId si quieres una relación 1–1 “informal”, o crea una FK separada.
+*/
