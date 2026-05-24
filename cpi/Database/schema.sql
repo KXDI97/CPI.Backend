@@ -51,7 +51,7 @@ CREATE TABLE "Users" (
     "CreatedAt"    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     CONSTRAINT "UQ_Users_Username" UNIQUE ("Username"),
     CONSTRAINT "UQ_Users_Email"    UNIQUE ("Email"),
-    CONSTRAINT "CK_Users_Role"     CHECK  ("Role" IN ('Admin', 'Seller', 'Viewer'))
+    CONSTRAINT "CK_Users_Role"     CHECK  ("Role" IN ('Admin', 'Seller', 'Viewer', 'Deactivated'))
 );
 
 -- ============================================================

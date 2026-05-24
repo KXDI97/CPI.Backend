@@ -60,6 +60,9 @@ var (hash, salt) = PasswordHasher.Hash(r.Password);
         if (!PasswordHasher.Verify(r.Password, u.PasswordHash, u.PasswordSalt))
             return Unauthorized("Credenciales inválidas.");
 
+        if (u.Role == "Deactivated")
+            return Unauthorized("ACCOUNT_DEACTIVATED");
+
         var token        = _tokens.Create(u, TimeSpan.FromMinutes(15));
         var refreshToken = _tokens.GenerateRefreshToken();
 
@@ -85,6 +88,7 @@ var (hash, salt) = PasswordHasher.Hash(r.Password);
 
         var user = await _db.Users.FindAsync(rt.UserId);
         if (user is null) return Unauthorized();
+        if (user.Role == "Deactivated") return Unauthorized("ACCOUNT_DEACTIVATED");
 
         rt.IsRevoked = true;
 
@@ -118,10 +122,13 @@ var (hash, salt) = PasswordHasher.Hash(r.Password);
     {
         return Ok(new
         {
-            Id = User.FindFirst("sub")?.Value,
+            Id       = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("sub")?.Value,
             Username = User.Identity?.Name,
-            Email = User.FindFirst("email")?.Value,
-            Role = User.FindFirst("role")?.Value
+            Email    = User.FindFirst(ClaimTypes.Email)?.Value
+                    ?? User.FindFirst("email")?.Value,
+            Role     = User.FindFirst(ClaimTypes.Role)?.Value
+                    ?? User.FindFirst("role")?.Value
         });
     }
 }

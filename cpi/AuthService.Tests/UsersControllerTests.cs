@@ -106,4 +106,27 @@ public class UsersControllerTests
 
         Assert.IsType<NotFoundResult>(result);
     }
+
+    [Fact]
+    public async Task Deactivate_ReturnsNoContent_AndSetsRoleDeactivated()
+    {
+        using var db = CreateDb();
+        var user = await AddUser(db, role: "Seller");
+
+        var result = await new UsersController(db).Deactivate(user.ID);
+
+        Assert.IsType<NoContentResult>(result);
+        var updated = await db.Users.FindAsync(user.ID);
+        Assert.Equal("Deactivated", updated!.Role);
+    }
+
+    [Fact]
+    public async Task Deactivate_ReturnsNotFound_WhenMissing()
+    {
+        using var db = CreateDb();
+
+        var result = await new UsersController(db).Deactivate(999);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
 }

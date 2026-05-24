@@ -125,4 +125,42 @@ public class AuthControllerTests
         Assert.NotNull(result.Value);
         Assert.False(string.IsNullOrEmpty(result.Value!.Token));
     }
+
+    [Fact]
+    public async Task Login_ReturnsUnauthorized_WhenAccountDeactivated()
+    {
+        using var db = CreateDb();
+        var (hash, salt) = PasswordHasher.Hash("Pass123!");
+        db.Users.Add(new User { Username = "disabled", Email = "disabled@test.com", Role = "Deactivated", PasswordHash = hash, PasswordSalt = salt });
+        await db.SaveChangesAsync();
+
+        var result = await CreateController(db).Login(new LoginRequest("disabled", "Pass123!"));
+
+        var unauth = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        Assert.Equal("ACCOUNT_DEACTIVATED", unauth.Value);
+    }
+
+    [Fact]
+    public async Task Refresh_ReturnsUnauthorized_WhenAccountDeactivated()
+    {
+        using var db = CreateDb();
+        var (hash, salt) = PasswordHasher.Hash("Pass123!");
+        var user = new User { Username = "disabled", Email = "disabled@test.com", Role = "Viewer", PasswordHash = hash, PasswordSalt = salt };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        // Login while still active to get a refresh token
+        var ctrl     = CreateController(db);
+        var loginRes = await ctrl.Login(new LoginRequest("disabled", "Pass123!"));
+        var rt       = loginRes.Value!.RefreshToken;
+
+        // Now deactivate the user
+        user.Role = "Deactivated";
+        await db.SaveChangesAsync();
+
+        var result = await ctrl.Refresh(new RefreshRequest(rt));
+
+        var unauth = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        Assert.Equal("ACCOUNT_DEACTIVATED", unauth.Value);
+    }
 }
