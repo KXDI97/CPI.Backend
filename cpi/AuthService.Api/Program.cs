@@ -54,4 +54,26 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// ── Seed superadmin ───────────────────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    const string seedUsername = "oscar+superadmin";
+    const string seedEmail    = "oscar@cpi.com";
+
+    if (!db.Users.Any(u => u.Username == seedUsername || u.Email == seedEmail))
+    {
+        var (hash, salt) = PasswordHasher.Hash("Oscar+Superadmin123!");
+        db.Users.Add(new AuthService.Domain.User
+        {
+            Username     = seedUsername,
+            Email        = seedEmail,
+            Role         = "Admin",
+            PasswordHash = hash,
+            PasswordSalt = salt
+        });
+        db.SaveChanges();
+    }
+}
+
 app.Run();
