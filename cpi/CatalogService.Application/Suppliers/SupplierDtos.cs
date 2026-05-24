@@ -1,6 +1,6 @@
 using System;
 
-namespace CPI.Application.Supplier;
+namespace CatalogService.Application.Suppliers;
 
 public record SupplierDto(
     int SupplierId,

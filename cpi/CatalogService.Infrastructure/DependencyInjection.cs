@@ -1,5 +1,6 @@
 using CatalogService.Application.Clients;
 using CatalogService.Application.Products;
+using CatalogService.Application.Suppliers;
 using CatalogService.Infrastructure.Data;
 using CatalogService.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -22,8 +23,9 @@ public static class DependencyInjection
             ));
 
         // Servicios
-        services.AddScoped<IClientService,  ClientService>();
-        services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IClientService,   ClientService>();
+        services.AddScoped<IProductService,  ProductService>();
+        services.AddScoped<ISupplierService, SupplierService>();
 
         return services;
     }
