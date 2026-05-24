@@ -5,6 +5,7 @@ using AuthService.Infrastructure.Data;
 using AuthService.Infrastructure.Security;
 using AuthService.Domain;
 using AuthService.Api.Contracts;
+using System.Security.Claims;
 
 namespace AuthService.Api.Controllers;
 
@@ -56,13 +57,59 @@ var (hash, salt) = PasswordHasher.Hash(r.Password);
         if (u is null || u.PasswordHash is null || u.PasswordSalt is null)
             return Unauthorized("Credenciales inválidas.");
 
-if (!PasswordHasher.Verify(r.Password, u.PasswordHash, u.PasswordSalt))
-    return Unauthorized("Credenciales inválidas.");
+        if (!PasswordHasher.Verify(r.Password, u.PasswordHash, u.PasswordSalt))
+            return Unauthorized("Credenciales inválidas.");
 
+        var token        = _tokens.Create(u, TimeSpan.FromMinutes(15));
+        var refreshToken = _tokens.GenerateRefreshToken();
 
-        var token = _tokens.Create(u, TimeSpan.FromHours(8));
+        _db.RefreshTokens.Add(new RefreshToken
+        {
+            UserId    = u.ID,
+            Token     = refreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(1),
+            IsRevoked = false
+        });
+        await _db.SaveChangesAsync();
 
-        return new AuthResponse(token, u.Username, u.Email, u.Role);
+        return new AuthResponse(token, refreshToken, u.Username, u.Email, u.Role);
+    }
+
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponse>> Refresh([FromBody] RefreshRequest r)
+    {
+        var rt = await _db.RefreshTokens
+            .FirstOrDefaultAsync(x => x.Token == r.RefreshToken && !x.IsRevoked && x.ExpiresAt > DateTime.UtcNow);
+
+        if (rt is null) return Unauthorized("Refresh token inválido o expirado.");
+
+        var user = await _db.Users.FindAsync(rt.UserId);
+        if (user is null) return Unauthorized();
+
+        rt.IsRevoked = true;
+
+        var newToken        = _tokens.Create(user, TimeSpan.FromMinutes(15));
+        var newRefreshToken = _tokens.GenerateRefreshToken();
+
+        _db.RefreshTokens.Add(new RefreshToken
+        {
+            UserId    = user.ID,
+            Token     = newRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(1),
+            IsRevoked = false
+        });
+        await _db.SaveChangesAsync();
+
+        return new AuthResponse(newToken, newRefreshToken, user.Username, user.Email, user.Role);
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] RefreshRequest r)
+    {
+        var rt = await _db.RefreshTokens.FirstOrDefaultAsync(x => x.Token == r.RefreshToken);
+        if (rt is not null) rt.IsRevoked = true;
+        await _db.SaveChangesAsync();
+        return NoContent();
     }
 
     [Authorize]

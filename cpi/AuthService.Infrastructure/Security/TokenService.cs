@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using AuthService.Domain;
@@ -33,5 +34,12 @@ public class TokenService
         var token = new JwtSecurityToken(_issuer, _audience, claims,
             notBefore: now, expires: now.Add(lifetime ?? TimeSpan.FromHours(8)), signingCredentials: creds);
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public string GenerateRefreshToken()
+    {
+        var bytes = new byte[64];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes);
     }
 }
