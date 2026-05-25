@@ -14,10 +14,16 @@ public class SalesDbContext : DbContext
     {
         base.OnModelCreating(mb);
 
+        bool isSqlServer = Database.ProviderName?.Contains("SqlServer") == true;
+
         // ── Sales ────────────────────────────────────────────────────────────
         mb.Entity<Sale>(e =>
         {
-            e.ToTable("Sales", tb => tb.UseSqlOutputClause(false));
+            if (isSqlServer)
+                e.ToTable("Sales", tb => tb.UseSqlOutputClause(false));
+            else
+                e.ToTable("Sales");
+
             e.HasKey(s => s.InvoiceId);
 
             e.Property(s => s.Status)
@@ -30,9 +36,13 @@ public class SalesDbContext : DbContext
             e.Property(s => s.Tax)         .HasColumnType("decimal(19,4)").HasDefaultValue(0m);
             e.Property(s => s.Total)       .HasColumnType("decimal(19,4)").HasDefaultValue(0m);
 
-            e.Property(s => s.InvoiceDate)
-                .HasColumnType("datetime2")
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+            if (isSqlServer)
+                e.Property(s => s.InvoiceDate)
+                    .HasColumnType("datetime2")
+                    .HasDefaultValueSql("SYSUTCDATETIME()");
+            else
+                e.Property(s => s.InvoiceDate)
+                    .HasDefaultValueSql("NOW()");
 
             e.HasMany(s => s.Details)
                 .WithOne(d => d.Sale)
@@ -44,7 +54,11 @@ public class SalesDbContext : DbContext
         // ── SaleDetails ──────────────────────────────────────────────────────
         mb.Entity<SaleDetail>(e =>
         {
-            e.ToTable("SalesDetails", tb => tb.UseSqlOutputClause(false));
+            if (isSqlServer)
+                e.ToTable("SalesDetails", tb => tb.UseSqlOutputClause(false));
+            else
+                e.ToTable("SalesDetails");
+
             e.HasKey(d => d.InvoiceDetailId);
 
             e.Property(d => d.ProductId) .HasMaxLength(50).IsRequired();

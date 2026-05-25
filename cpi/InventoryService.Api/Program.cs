@@ -4,7 +4,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // EF Core
 builder.Services.AddDbContext<CpiDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+        options.UseNpgsql(builder.Configuration.GetConnectionString("PostgreSQL"));
+    else
+        options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer"));
+});
 
 // 👇 ESTA LÍNEA FALTABA
 builder.Services.AddControllers();

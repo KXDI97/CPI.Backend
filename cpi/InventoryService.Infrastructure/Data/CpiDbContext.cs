@@ -24,8 +24,6 @@ public class CpiDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        b.HasDefaultSchema("dbo");
-
         b.Entity<User>().ToTable("Users").HasKey(x => x.Id);
 
         b.Entity<Supplier>().ToTable("Suppliers").HasKey(x => x.SupplierId);

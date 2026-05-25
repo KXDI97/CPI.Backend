@@ -17,10 +17,17 @@ public static class DependencyInjection
     {
         // DbContext
         services.AddDbContext<CpiDbContext>(opt =>
-            opt.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.MigrationsAssembly(typeof(CpiDbContext).Assembly.FullName)
-            ));
+        {
+            var migrations = typeof(CpiDbContext).Assembly.FullName;
+            if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+                opt.UseNpgsql(
+                    configuration.GetConnectionString("PostgreSQL"),
+                    sql => sql.MigrationsAssembly(migrations));
+            else
+                opt.UseSqlServer(
+                    configuration.GetConnectionString("SqlServer"),
+                    sql => sql.MigrationsAssembly(migrations));
+        });
 
         // Servicios
         services.AddScoped<IClientService,   ClientService>();

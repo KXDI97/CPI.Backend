@@ -2,8 +2,8 @@ using CatalogService.Api.Clients;
 using CatalogService.Domain.Entities;
 using CatalogService.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Linq.Expressions;
 
 namespace CatalogService.Api.Clients;
@@ -149,11 +149,10 @@ public class ClientsController : ControllerBase
         return NoContent();
     }
 
-    // SQL Server: 2601/2627 claves únicas
     private static bool IsUniqueViolation(DbUpdateException ex)
     {
-        if (ex.InnerException is SqlException sqlEx)
-            return sqlEx.Number is 2601 or 2627;
+        if (ex.InnerException is PostgresException pgEx)
+            return pgEx.SqlState == "23505";
         return false;
     }
 }
