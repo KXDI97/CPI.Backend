@@ -31,6 +31,8 @@ builder.Services.AddScoped<IPurchaseOrderService,   PurchaseOrderService>();
 builder.Services.AddScoped<IPurchaseReceiptService, PurchaseReceiptService>();
 builder.Services.AddScoped<ITransactionService,     TransactionService>();
 builder.Services.AddScoped<ILogicalCostService,     LogicalCostService>();
+builder.Services.AddScoped<IPurchaseOrderDetailService, PurchaseOrderDetailService>();
+builder.Services.AddScoped<IPurchaseReceiptDetailService, PurchaseReceiptDetailService>();
 
 var app = builder.Build();
 

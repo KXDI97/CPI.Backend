@@ -52,7 +52,7 @@ public class TransactionService : ITransactionService
             InvoiceNumber = dto.InvoiceNumber,
             Reminder = dto.Reminder,
             TransactionStatus = dto.TransactionStatus,
-            PaymentDate = dto.PaymentDate
+            PaymentDate = DateTime.UtcNow
         };
 
         _db.Transactions.Add(entity);
@@ -75,7 +75,7 @@ public class TransactionService : ITransactionService
 
         entity.Reminder = dto.Reminder ?? entity.Reminder;
         entity.TransactionStatus = dto.TransactionStatus;
-        entity.PaymentDate = dto.PaymentDate;
+        entity.PaymentDate = dto.PaymentDate ?? entity.PaymentDate;
 
         await _db.SaveChangesAsync(ct);
         return true;

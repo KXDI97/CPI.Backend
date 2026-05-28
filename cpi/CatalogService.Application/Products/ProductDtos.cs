@@ -16,6 +16,7 @@ public record CreateProductDto(
     decimal Value,
     string Category,
     string Description,
+    decimal Stock,
     int SupplierId
 );
 
@@ -24,5 +25,6 @@ public record UpdateProductDto(
     decimal Value,
     string Category,
     string Description,
+    decimal Stock,
     int SupplierId
 );
