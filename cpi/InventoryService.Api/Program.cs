@@ -1,8 +1,20 @@
 using InventoryService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// EF Core
+const string CorsPolicy = "CpiCors";
+builder.Services.AddCors(opt =>
+{
+    opt.AddPolicy(CorsPolicy, p => p
+        .WithOrigins(
+            "http://localhost:5500",
+            "http://127.0.0.1:5500",
+            "http://localhost:5173")
+        .AllowAnyHeader()
+        .AllowAnyMethod());
+});
+
 builder.Services.AddDbContext<CpiDbContext>(options =>
 {
     if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
@@ -11,9 +23,7 @@ builder.Services.AddDbContext<CpiDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer"));
 });
 
-// 👇 ESTA LÍNEA FALTABA
 builder.Services.AddControllers();
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -25,7 +35,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+app.UseCors(CorsPolicy);
 
 // Habilita controladores (atribute routing)
 app.MapControllers();
