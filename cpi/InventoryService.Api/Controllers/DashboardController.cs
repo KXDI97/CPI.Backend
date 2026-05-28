@@ -13,19 +13,25 @@ public class DashboardController : ControllerBase
     public DashboardController(CpiDbContext db) => _db = db;
 
     [HttpGet("kpis")]
-    public async Task<IActionResult> GetKpis(CancellationToken ct)
+    public async Task<IActionResult> GetKpis(
+        [FromQuery] DateTime? dateFrom, [FromQuery] DateTime? dateTo, CancellationToken ct)
     {
-        var totalOrders = await _db.PurchaseOrders.CountAsync(ct);
+        var orders = _db.PurchaseOrders.AsQueryable();
+        if (dateFrom.HasValue) orders = orders.Where(o => o.OrderDate >= dateFrom.Value);
+        if (dateTo.HasValue)   orders = orders.Where(o => o.OrderDate < dateTo.Value.AddDays(1));
+
+        var totalOrders = await orders.CountAsync(ct);
+
+        var filteredIds = orders.Select(o => o.PurchaseOrderId);
 
         var totalSpending = await _db.PurchaseOrderDetails
+            .Where(d => filteredIds.Contains(d.PurchaseOrderId))
             .SumAsync(d => (decimal?)d.LineTotal, ct) ?? 0;
 
-        var pendingPayments = await (
-            from o in _db.PurchaseOrders
-            where o.Status == "Pending"
-            join d in _db.PurchaseOrderDetails on o.PurchaseOrderId equals d.PurchaseOrderId
-            select (decimal?)d.LineTotal
-        ).SumAsync(ct) ?? 0;
+        var pendingIds = orders.Where(o => o.Status == "Pending").Select(o => o.PurchaseOrderId);
+        var pendingPayments = await _db.PurchaseOrderDetails
+            .Where(d => pendingIds.Contains(d.PurchaseOrderId))
+            .SumAsync(d => (decimal?)d.LineTotal, ct) ?? 0;
 
         var activeProducts = await _db.Products.CountAsync(p => p.Stock > 0, ct);
 
@@ -51,16 +57,20 @@ public class DashboardController : ControllerBase
     {
         var q = _db.PurchaseOrders.AsQueryable();
         if (dateFrom.HasValue) q = q.Where(o => o.OrderDate >= dateFrom.Value);
-        if (dateTo.HasValue)   q = q.Where(o => o.OrderDate <= dateTo.Value);
+        if (dateTo.HasValue)   q = q.Where(o => o.OrderDate < dateTo.Value.AddDays(1));
 
-        var raw = await q
-            .GroupBy(o => new { o.OrderDate.Year, o.OrderDate.Month })
-            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
-            .OrderBy(x => x.Year).ThenBy(x => x.Month)
-            .ToListAsync(ct);
+        var filteredIds = q.Select(o => o.PurchaseOrderId);
+
+        var raw = await (
+            from d in _db.PurchaseOrderDetails
+            where filteredIds.Contains(d.PurchaseOrderId)
+            join o in _db.PurchaseOrders on d.PurchaseOrderId equals o.PurchaseOrderId
+            group d.LineTotal by new { o.OrderDate.Year, o.OrderDate.Month } into g
+            select new { g.Key.Year, g.Key.Month, Total = g.Sum() }
+        ).OrderBy(x => x.Year).ThenBy(x => x.Month).ToListAsync(ct);
 
         var labels = raw.Select(d => new DateTime(d.Year, d.Month, 1).ToString("MMM yyyy")).ToArray();
-        var data   = raw.Select(d => d.Count).ToArray();
+        var data   = raw.Select(d => (double)d.Total).ToArray();
 
         return Ok(new { labels, data });
     }
@@ -71,7 +81,7 @@ public class DashboardController : ControllerBase
     {
         var orders = _db.PurchaseOrders.AsQueryable();
         if (dateFrom.HasValue) orders = orders.Where(o => o.OrderDate >= dateFrom.Value);
-        if (dateTo.HasValue)   orders = orders.Where(o => o.OrderDate <= dateTo.Value);
+        if (dateTo.HasValue)   orders = orders.Where(o => o.OrderDate < dateTo.Value.AddDays(1));
 
         var filteredIds = orders.Select(o => o.PurchaseOrderId);
 
@@ -91,12 +101,15 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("upcoming-payments")]
-    public async Task<IActionResult> GetUpcomingPayments(CancellationToken ct)
+    public async Task<IActionResult> GetUpcomingPayments(
+        [FromQuery] DateTime? dateFrom, [FromQuery] DateTime? dateTo, CancellationToken ct)
     {
         var items = await (
             from s in _db.Sales
             join c in _db.Clients on s.ClientId equals c.ClientId
             where s.Status != "Paid"
+               && (!dateFrom.HasValue || s.InvoiceDate >= dateFrom.Value)
+               && (!dateTo.HasValue   || s.InvoiceDate < dateTo.Value.AddDays(1))
             orderby s.InvoiceDate
             select new
             {

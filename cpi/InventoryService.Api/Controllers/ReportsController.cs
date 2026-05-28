@@ -80,11 +80,20 @@ public class ReportsController : ControllerBase
     public async Task<IActionResult> GetInventory(
         [FromQuery] DateTime? dateFrom, [FromQuery] DateTime? dateTo, CancellationToken ct)
     {
+        // Always return all products; movements are supplementary (period-filtered entries/exits)
+        var products = await (
+            from p in _db.Products
+            join s in _db.Suppliers on p.SupplierId equals s.SupplierId into sj
+            from s in sj.DefaultIfEmpty()
+            orderby p.Name
+            select new { p.ProductId, p.Name, p.Category, p.Stock }
+        ).ToListAsync(ct);
+
         var movQ = _db.InventoryMovements.AsQueryable();
         if (dateFrom.HasValue) movQ = movQ.Where(m => m.CreatedAt >= dateFrom.Value);
-        if (dateTo.HasValue)   movQ = movQ.Where(m => m.CreatedAt <= dateTo.Value);
+        if (dateTo.HasValue)   movQ = movQ.Where(m => m.CreatedAt < dateTo.Value.AddDays(1));
 
-        var movements = await movQ
+        var movTotals = await movQ
             .GroupBy(m => m.ProductId)
             .Select(g => new
             {
@@ -92,28 +101,20 @@ public class ReportsController : ControllerBase
                 Entries   = (int)g.Where(m => m.QtyChange > 0).Sum(m => (double)m.QtyChange),
                 Exits     = (int)g.Where(m => m.QtyChange < 0).Sum(m => -(double)m.QtyChange),
             })
-            .ToListAsync(ct);
+            .ToDictionaryAsync(x => x.ProductId, ct);
 
-        var productIds = movements.Select(m => m.ProductId).ToList();
-        var products = await _db.Products
-            .Where(p => productIds.Contains(p.ProductId))
-            .Select(p => new { p.ProductId, p.Name, p.Category, p.Stock })
-            .ToDictionaryAsync(p => p.ProductId, ct);
-
-        return Ok(movements
-            .Select(m =>
+        return Ok(products.Select(p =>
+        {
+            movTotals.TryGetValue(p.ProductId, out var mov);
+            return new
             {
-                products.TryGetValue(m.ProductId, out var p);
-                return new
-                {
-                    product  = p?.Name ?? m.ProductId,
-                    category = p?.Category ?? "—",
-                    entries  = m.Entries,
-                    exits    = m.Exits,
-                    stock    = p?.Stock ?? 0
-                };
-            })
-            .OrderBy(x => x.product));
+                product  = p.Name,
+                category = p.Category,
+                entries  = mov?.Entries ?? 0,
+                exits    = mov?.Exits   ?? 0,
+                stock    = p.Stock
+            };
+        }));
     }
 
     private static string NormaliseStatus(string s) => s?.ToLower() switch

@@ -1,6 +1,9 @@
 using InventoryService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
+// Allow ASP.NET query-string DateTime (Kind=Unspecified) to be passed to PostgreSQL
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 const string CorsPolicy = "CpiCors";
