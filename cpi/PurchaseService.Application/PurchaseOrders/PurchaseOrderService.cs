@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PurchaseService.Domain.Entities;
 using PurchaseService.Application.PurchaseOrders.Dtos;
 using PurchaseService.Infrastructure.Data;
+using PurchaseService.Application.PurchaseOrders;
 
 namespace PurchaseService.Application.PurchaseOrders;
 public class PurchaseOrderService : IPurchaseOrderService
@@ -25,18 +26,31 @@ public class PurchaseOrderService : IPurchaseOrderService
             ))
             .FirstOrDefaultAsync(ct);
 
-    public async Task<PurchaseOrderDto> CreateAsync(CreatePurchaseOrderDto dto, CancellationToken ct = default)
+  public async Task<PurchaseOrderDto> CreateAsync(CreatePurchaseOrderDto dto, CancellationToken ct = default)
+{
+    var entity = new PurchaseOrder
     {
-        var entity = new PurchaseOrder
+        SupplierId = dto.SupplierId,
+        OrderDate  = dto.OrderDate == default ? DateTime.UtcNow : dto.OrderDate,
+        Status     = "Pendiente",
+        Details    = dto.Details.Select(d => new PurchaseOrderDetail
         {
-            SupplierId = dto.SupplierId,
-            OrderDate = dto.OrderDate,
-            Status = "Pendiente"
-        };
-        _context.PurchaseOrders.Add(entity);
-        await _context.SaveChangesAsync(ct);
-        return new PurchaseOrderDto(entity.PurchaseOrderId, entity.OrderDate, entity.SupplierId, entity.Status);
-    }
+            ProductId = d.ProductId,
+            Quantity  = d.Quantity,
+            UnitPrice = d.UnitPrice
+        }).ToList()
+    };
+
+    _context.PurchaseOrders.Add(entity);
+    await _context.SaveChangesAsync(ct);
+
+    return new PurchaseOrderDto(
+        entity.PurchaseOrderId,
+        entity.OrderDate,
+        entity.SupplierId,
+        entity.Status
+    );
+}
 
     public async Task<bool> UpdateAsync(int id, UpdatePurchaseOrderDto dto, CancellationToken ct = default)
     {

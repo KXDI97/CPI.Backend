@@ -50,7 +50,7 @@ public sealed class ProductService : IProductService
             Value       = dto.Value,
             Category    = dto.Category,
             Description = dto.Description,
-            Stock       = 0,             // stock inicial siempre 0; se mueve por movimientos
+            Stock       = dto.Stock,
             SupplierId  = dto.SupplierId
         };
 
@@ -70,6 +70,7 @@ public sealed class ProductService : IProductService
         product.Value       = dto.Value;
         product.Category    = dto.Category;
         product.Description = dto.Description;
+        product.Stock       = dto.Stock;
         product.SupplierId  = dto.SupplierId;
 
         await _db.SaveChangesAsync(ct);
